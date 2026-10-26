@@ -18,3 +18,5 @@ backend/target/
 .DS_Store
 # Logs
 *.log
+
+**/target/

@@ -1,0 +1,22 @@
+server:
+  port: ${SERVER_PORT:8081}
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/smartcane}
+    username: ${DB_USER:smartcane}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update # DEV ONLY; migrate with Flyway before deployment
+    open-in-view: false
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+smartcane:
+  mqtt:
+    url: ${MQTT_URL:tcp://localhost:1883}
+    client-id: ${MQTT_CLIENT_ID:smartcane-backend-local}
+    topic: smartcane/+/telemetry
+    events-topic: smartcane/+/events
+    username: ${MQTT_USERNAME:}
+    password: ${MQTT_PASSWORD:}
