@@ -1,8 +1,16 @@
 package vn.edu.ptit.smartcane.repo;
-import vn.edu.ptit.smartcane.model.TelemetryRecord;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.domain.Pageable;
+
+import java.time.Instant;
 import java.util.List;
-public interface TelemetryRepository extends JpaRepository<TelemetryRecord,Long> {
- List<TelemetryRecord> findByDeviceIdOrderByReceivedAtDesc(String deviceId,Pageable page);
+
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import vn.edu.ptit.smartcane.model.TelemetryRecord;
+
+public interface TelemetryRepository extends JpaRepository<TelemetryRecord, Long> {
+    List<TelemetryRecord> findByDeviceIdOrderByReceivedAtDesc(String deviceId, Pageable pageable);
+
+    List<TelemetryRecord> findByDeviceIdAndReceivedAtBetweenOrderByReceivedAtDesc(
+            String deviceId, Instant from, Instant to, Pageable pageable);
 }
