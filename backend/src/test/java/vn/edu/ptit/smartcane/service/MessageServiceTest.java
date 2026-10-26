@@ -21,7 +21,12 @@ class MessageServiceTest {
   @BeforeEach void setup() {
     telemetry = mock(TelemetryRepository.class);
     incidents = mock(IncidentRepository.class);
-    service = new MessageService(telemetry, incidents, new ObjectMapper());
+    service = new MessageService(
+        telemetry,
+        incidents,
+        new ObjectMapper(),
+        event -> {}
+    );
   }
 
   @Test void validTelemetryIsPersisted() {

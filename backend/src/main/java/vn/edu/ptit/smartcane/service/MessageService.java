@@ -2,10 +2,12 @@ package vn.edu.ptit.smartcane.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.edu.ptit.smartcane.model.*;
 import vn.edu.ptit.smartcane.repo.*;
+import vn.edu.ptit.smartcane.realtime.RealtimeSaved;
 import java.time.Instant;
 import java.util.Set;
 
@@ -14,7 +16,8 @@ public class MessageService {
  private static final Set<String> EVENT_TYPES=Set.of("SOS","CANE_FALL_SUSPECTED","CANE_FALL_ALERT","CANCEL");
  private final TelemetryRepository telemetry; private final IncidentRepository incidents;
  private final ObjectMapper json;
- public MessageService(TelemetryRepository t,IncidentRepository i,ObjectMapper j){telemetry=t;incidents=i;json=j;}
+ private final ApplicationEventPublisher publisher;
+ public MessageService(TelemetryRepository t,IncidentRepository i,ObjectMapper j,ApplicationEventPublisher p){telemetry=t;incidents=i;json=j;publisher=p;}
  static String stringRequired(JsonNode node,String key){
    JsonNode v=node.get(key);
    if(v==null || !v.isTextual() || v.asText().isBlank() || v.asText().length()>120)throw new IllegalArgumentException("Invalid field: "+key);
@@ -61,6 +64,7 @@ public class MessageService {
    t.batteryVoltage=optionalDouble(n,"battery_voltage",0.0,5.0);
    if(Boolean.TRUE.equals(t.gpsValid)&&(t.latitude==null||t.longitude==null))throw new IllegalArgumentException("gps_valid=true requires coordinates");
    telemetry.save(t);
+   publisher.publishEvent(new RealtimeSaved(id,"telemetry",t));
   }else if(topic.endsWith("/events")){
    String id=validateTopic(n,topic,"events");
    String eventId=stringRequired(n,"event_id");String type=stringRequired(n,"type");
@@ -70,7 +74,8 @@ public class MessageService {
    e.latitude=optionalDouble(n,"latitude",-90.0,90.0);e.longitude=optionalDouble(n,"longitude",-180.0,180.0);e.gpsValid=optionalBool(n,"gps_valid");
    if(Boolean.TRUE.equals(e.gpsValid)&&(e.latitude==null||e.longitude==null))throw new IllegalArgumentException("gps_valid=true requires coordinates");
    incidents.save(e);
-   // TODO G08: enqueue Telegram notifications via durable outbox; never send from MQTT callback.
+   publisher.publishEvent(new RealtimeSaved(id,"incident",e));
+   // Telegram notification / durable outbox belongs to a separate integration task.
   }else throw new IllegalArgumentException("Unsupported topic");
  }
 }
