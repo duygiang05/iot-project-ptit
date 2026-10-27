@@ -1,1 +1,5 @@
-# No external libraries are required for the fake-data Wokwi sketch.
+Adafruit MPU6050
+Adafruit Unified Sensor
+Adafruit BusIO
+Adafruit GFX Library
+Adafruit SSD1306
