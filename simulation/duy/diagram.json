@@ -5,7 +5,7 @@
   "parts": [
     { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
     { "type": "wokwi-mpu6050", "id": "mpu", "top": -90, "left": 250, "attrs": {} },
-    { "type": "wokwi-pushbutton", "id": "button", "top": 100, "left": 260, "attrs": { "color": "green", "x": "pressed" } },
+    { "type": "wokwi-pushbutton", "id": "button", "top": 100, "left": 260, "attrs": { "color": "green" } },
     { "type": "wokwi-buzzer", "id": "buzzer", "top": 210, "left": 260, "attrs": { "volume": "0.1" } }
   ],
   "connections": [
@@ -17,7 +17,7 @@
     [ "esp:GND.1", "mpu:GND", "black", [] ],
     [ "esp:D13", "button:1.l", "green", [] ],
     [ "button:2.l", "esp:GND.1", "black", [] ],
-    [ "esp:D14", "buzzer:2", "orange", [] ],
+    [ "esp:D25", "buzzer:2", "orange", [] ],
     [ "buzzer:1", "esp:GND.1", "black", [] ]
   ]
 }

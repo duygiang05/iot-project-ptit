@@ -1,2 +1,1 @@
-# No external libraries are required.
-# Wire.h and math.h are included with the ESP32 Arduino core in Wokwi.
+# No external libraries are required for the fake-data Wokwi sketch.
