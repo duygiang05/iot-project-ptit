@@ -5,7 +5,7 @@
 1. Tạo project mới loại **ESP32** tại Wokwi.
 2. Thay nội dung `sketch.ino` bằng file cùng tên trong folder này.
 3. Mở `diagram.json` trong editor, thay bằng sơ đồ cùng tên trong folder này.
-4. Bấm Start Simulation và xem Serial Monitor ở 115200 baud. Không cần cài thư viện ngoài.
+4. `libraries.txt` đã ghi dependency (không cần thư viện ngoài). Bấm Start Simulation và xem Serial Monitor ở 115200 baud.
 
 - Nhấn giữ nút GPIO13 ít nhất 3 giây: nhận đúng một `[EVENT] SOS`; còi bật trong lúc nhấn và chirp khi gửi SOS.
 - Nghiêng MPU6050 vượt 60° đồng thời tạo gia tốc thấp hơn 0.55g hoặc cao hơn 1.8g: sau 600ms sẽ có `[EVENT] CANE_FALL_SUSPECTED`.
