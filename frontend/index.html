@@ -1,11 +1,467 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Smart Cane Dashboard — Mock</title>
-<style>body{font:16px system-ui;margin:0;background:#f5f7fb;color:#182638}header{background:#163a64;color:#fff;padding:24px}main{max-width:1100px;margin:auto;padding:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.card{background:white;border:1px solid #dce3ed;border-radius:14px;padding:18px}.value{font-size:26px;font-weight:750}#map{height:340px;border-radius:14px;overflow:hidden;background:#e5ebf2;margin-top:14px}.note{color:#526075;font-size:13px}</style>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" /></head>
-<body><header><h1>Smart Cane IoT</h1><p>Dashboard demo — dữ liệu giả, chưa kết nối ESP32 / backend</p></header><main><div class="grid">
-<div class="card"><div>Thiết bị</div><div class="value" id="device">cane-01</div></div>
-<div class="card"><div>Khoảng cách</div><div class="value" id="distance">—</div></div>
-<div class="card"><div>Cảm biến nước</div><div class="value" id="water">—</div></div>
-<div class="card"><div>SOS</div><div class="value" id="sos">—</div></div></div>
-<div id="map" role="img" aria-label="Bản đồ vị trí mẫu"></div><p class="note">Dữ liệu minh họa: vị trí Hà Nội giả lập. Leaflet cần Internet để tải thư viện và bản đồ nền.</p></main>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="./mock.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Hệ thống giám sát và cảnh báo thông minh cho người khiếm thị Smart Cane IoT - Học viện Công nghệ Bưu chính Viễn thông (PTIT).">
+  <meta name="author" content="Đạt (PTIT 2026)">
+  <title>Smart Cane IoT — PTIT | Trung Tâm Giám Sát & Điều Khiển</title>
+
+  <!-- Google Fonts: Plus Jakarta Sans & Fira Code -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+
+  <!-- App Stylesheet -->
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+  <!-- ========================================================================
+       HEADER: Brand, Connection Status & Quick Controls
+       ======================================================================== -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-logo-icon">🦯</div>
+      <div class="brand-info">
+        <h1>
+          Smart Cane IoT
+          <span class="badge-tag">PTIT 2026</span>
+        </h1>
+        <p>Hệ thống giám sát gậy thông minh hỗ trợ người khiếm thị</p>
+      </div>
+    </div>
+
+    <div class="header-status-group">
+      <!-- Device Pill -->
+      <div class="status-pill">
+        <span style="color: var(--text-dim);">Thiết bị:</span>
+        <strong id="device-id-badge" style="color: var(--accent-cyan);">cane-01</strong>
+      </div>
+
+      <!-- Online/Offline Status -->
+      <div class="status-pill">
+        <div id="status-dot" class="status-dot pulsing"></div>
+        <span id="status-text">TRỰC TUYẾN</span>
+      </div>
+
+      <!-- Last Synced -->
+      <div class="status-pill" style="font-size: 0.76rem; color: var(--text-dim);">
+        🕒 <span id="last-sync-time">--:--:--</span>
+      </div>
+
+      <!-- Backend Mode Toggle (Đ03) -->
+      <button id="btn-toggle-backend" class="btn-header" title="Chuyển đổi giữa chế độ Giả lập và Kết nối Backend thật (REST / WebSocket)">
+        <span id="backend-status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#eab308; margin-right:5px;"></span>
+        <span id="backend-status-text">Mô Phỏng (Mock)</span>
+      </button>
+
+      <!-- Quick Actions -->
+      <button id="btn-toggle-sound" class="btn-header" title="Bật/Tắt âm thanh cảnh báo demo">
+        🔊 Âm Báo: BẬT
+      </button>
+
+      <button id="btn-open-modal" class="btn-header primary" title="Xem hướng dẫn và thông số phần cứng">
+        📖 Tài Liệu / Pinout
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       EMERGENCY BANNER: Kích hoạt khi có SOS, Gậy đổ hoặc Tiếp xúc nước
+       ======================================================================== -->
+  <div id="emergency-banner" class="emergency-banner" role="alert">
+    <div class="emergency-content">
+      <div class="emergency-icon">🚨</div>
+      <div class="emergency-text">
+        <h3 id="emergency-title">CẢNH BÁO KHẨN CẤP</h3>
+        <p id="emergency-desc">Đã phát hiện tình huống bất thường từ gậy thông minh.</p>
+      </div>
+    </div>
+    <div class="emergency-actions">
+      <button id="btn-dismiss-alert" class="btn-emergency">Xác Nhận & Tắt Còi</button>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MAIN DASHBOARD
+       ======================================================================== -->
+  <main class="main-container">
+
+    <!-- 1. Hàng thẻ số liệu cảm biến (Telemetry Cards) -->
+    <section class="telemetry-grid" aria-label="Các thông số đo cảm biến">
+      
+      <!-- Card: Khoảng cách vật cản (HC-SR04) -->
+      <div class="glass-panel telemetry-card card-distance">
+        <div class="card-header">
+          <span class="card-title">📏 Khoảng Cách Vật Cản</span>
+          <span class="card-owner-tag">Tùng (HC-SR04)</span>
+        </div>
+        <div class="card-body">
+          <div class="value-display">
+            <span id="val-distance" class="metric-number">--</span>
+            <span class="metric-unit">cm</span>
+          </div>
+          <div class="progress-container">
+            <div id="bar-distance" class="progress-bar progress-safe" style="width: 50%;"></div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span id="badge-distance" class="state-badge safe">AN TOÀN</span>
+          <span id="note-distance" style="font-size: 0.74rem;">Mô-tơ: Không rung</span>
+        </div>
+      </div>
+
+      <!-- Card: Cảm biến Nước (Water Sensor - Đạt) -->
+      <div class="glass-panel telemetry-card card-water">
+        <div class="card-header">
+          <span class="card-title">💧 Cảm Biến Nước</span>
+          <span class="card-owner-tag tag-dat">Đạt (GPIO 35)</span>
+        </div>
+        <div class="card-body">
+          <div class="value-display">
+            <span id="val-water" class="metric-number">KHÔ RÁO</span>
+          </div>
+          <div class="progress-container">
+            <div id="bar-water" class="progress-bar progress-cyan" style="width: 10%;"></div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span id="badge-water" class="state-badge safe">✓ AN TOÀN</span>
+          <span id="val-water-adc" style="font-family: monospace; font-size: 0.74rem;">ADC: 340 / 4095</span>
+        </div>
+      </div>
+
+      <!-- Card: Cảm biến Ánh Sáng & Đèn LED (LDR & LED - Đạt) -->
+      <div class="glass-panel telemetry-card card-light">
+        <div class="card-header">
+          <span class="card-title">💡 Môi Trường & Đèn</span>
+          <span class="card-owner-tag tag-dat">Đạt (GPIO 34 & 32)</span>
+        </div>
+        <div class="card-body">
+          <div class="value-display">
+            <span id="val-light" class="metric-number">--</span>
+            <span id="val-light-percent" class="metric-unit">ADC</span>
+          </div>
+          <div class="progress-container">
+            <div id="bar-light" class="progress-bar progress-warning" style="width: 70%;"></div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span id="badge-led" class="state-badge safe">🌙 TẮT (SÁNG)</span>
+          <span id="led-indicator-text" style="font-size: 0.74rem;">Tự động theo LDR</span>
+        </div>
+      </div>
+
+      <!-- Card: An Toàn & SOS (MPU6050 & Nút bấm - Duy) -->
+      <div class="glass-panel telemetry-card card-safety">
+        <div class="card-header">
+          <span class="card-title">🧭 Trạng Thái Gậy & SOS</span>
+          <span class="card-owner-tag">Duy (MPU6050)</span>
+        </div>
+        <div class="card-body">
+          <div class="value-display">
+            <span id="val-safety" class="metric-number">ỔN ĐỊNH</span>
+          </div>
+          <div class="progress-container">
+            <div class="progress-bar progress-safe" style="width: 100%;"></div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span id="badge-safety" class="state-badge safe">BÌNH THƯỜNG</span>
+          <span id="note-safety" style="font-size: 0.74rem;">Không ngã / Không SOS</span>
+        </div>
+      </div>
+
+      <!-- Card: Nguồn & Pin 18650 -->
+      <div class="glass-panel telemetry-card card-battery">
+        <div class="card-header">
+          <span class="card-title">🔋 Nguồn & Pin 18650</span>
+          <span class="card-owner-tag">Tùng (TP4056/Boost)</span>
+        </div>
+        <div class="card-body">
+          <div class="value-display">
+            <span id="val-battery" class="metric-number">94%</span>
+            <span id="val-battery-volt" class="metric-unit">4.12 V</span>
+          </div>
+          <div class="progress-container">
+            <div id="bar-battery" class="progress-bar progress-safe" style="width: 94%;"></div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="state-badge safe">HOẠT ĐỘNG TỐT</span>
+          <span style="font-size: 0.74rem;">Ước lượng qua ADC1</span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 2. Phần giữa: Bản đồ Leaflet GPS & Bảng thông số kỹ thuật -->
+    <section class="center-grid">
+      
+      <!-- Leaflet Map Card -->
+      <div class="glass-panel map-card">
+        <div class="map-toolbar">
+          <div class="map-title">
+            <span>🗺️ Bản Đồ Vị Trí & Hàng Rào An Toàn (Geofence)</span>
+            <span id="badge-geofence" class="state-badge safe">✓ TRONG VÙNG AN TOÀN</span>
+          </div>
+          <div class="map-controls-group">
+            <button id="btn-center-map" class="btn-map-action" title="Đưa góc nhìn về vị trí gậy">🎯 Định Vị</button>
+            <button id="btn-toggle-geofence" class="btn-map-action active" title="Bật/Tắt vòng tròn an toàn">⭕ Hàng Rào</button>
+            <button id="btn-clear-path" class="btn-map-action" title="Xóa lịch sử vết di chuyển">🧹 Xóa Vết</button>
+          </div>
+        </div>
+
+        <!-- Khung chứa Leaflet Map -->
+        <div id="map-container" role="region" aria-label="Bản đồ theo dõi gậy thông minh Leaflet"></div>
+
+        <div class="map-footer-info">
+          <span>📍 Địa chỉ giả lập: <strong>Học viện Công nghệ Bưu chính Viễn thông (PTIT)</strong></span>
+          <span id="geofence-dist-text">Bán kính an toàn: 350m</span>
+        </div>
+      </div>
+
+      <!-- Hardware & Pinout Sidebar -->
+      <div class="side-panel">
+        
+        <!-- Hardware Specs -->
+        <div class="glass-panel panel-card">
+          <h3>⚡ Sơ Đồ Chân Phần Cứng (ESP32)</h3>
+          <div class="spec-list">
+            <div class="spec-item">
+              <span class="spec-label">💧 Cảm biến nước (Đạt)</span>
+              <span class="spec-val" style="color: var(--accent-cyan);">GPIO 35 (ADC1)</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">💡 Cảm biến LDR (Đạt)</span>
+              <span class="spec-val" style="color: var(--accent-amber);">GPIO 34 (ADC1)</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">🔦 LED ban đêm (Đạt)</span>
+              <span class="spec-val" style="color: #fff;">GPIO 32 (220Ω)</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">📏 HC-SR04 Trig/Echo (Tùng)</span>
+              <span class="spec-val">GPIO 25 / 26</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">📳 Mô tơ rung (Tùng)</span>
+              <span class="spec-val">GPIO 27 (Driver)</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">🆘 Nút SOS (Duy)</span>
+              <span class="spec-val">GPIO 13 (Pull-up)</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">🔔 Còi Buzzer (Duy)</span>
+              <span class="spec-val">GPIO 14 (Driver)</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">🧭 MPU6050 SDA/SCL (Duy)</span>
+              <span class="spec-val">GPIO 21 / 22</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Network / Contract Info -->
+        <div class="glass-panel panel-card">
+          <h3>📡 Giao Thức MQTT & Backend</h3>
+          <div class="spec-list">
+            <div class="spec-item">
+              <span class="spec-label">Topic Telemetry</span>
+              <span class="spec-val" style="font-size: 0.72rem;">smartcane/cane-01/telemetry</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">Topic Events</span>
+              <span class="spec-val" style="font-size: 0.72rem;">smartcane/cane-01/events</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">Broker Mosquitto</span>
+              <span class="spec-val">Port 1883 / QoS 0-1</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">Backend Phụ Trách</span>
+              <span class="spec-val">Giang (Spring Boot)</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- 3. Hàng dưới: Lịch sử sự kiện thời gian thực & Bảng điều khiển giả lập kịch bản -->
+    <section class="bottom-grid">
+
+      <!-- Real-time Event Feed -->
+      <div class="glass-panel event-card">
+        <div class="event-header">
+          <div style="font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>📜 Lịch Sử Sự Kiện Thời Gian Thực</span>
+          </div>
+          <div class="event-filters">
+            <button class="filter-btn active" data-filter="all">Tất cả</button>
+            <button class="filter-btn" data-filter="danger">Khẩn cấp</button>
+            <button class="filter-btn" data-filter="water">Nước</button>
+            <button class="filter-btn" data-filter="environment">Môi trường</button>
+            <button id="btn-export-log" class="filter-btn" title="Tải file JSON nhật ký">📥 Xuất JSON</button>
+          </div>
+        </div>
+
+        <!-- Danh sách sự kiện cuộn -->
+        <div id="event-list-container" class="event-list" role="log"></div>
+      </div>
+
+      <!-- Scenario Simulator Panel (Phục vụ kiểm thử & demo Đ02) -->
+      <div class="glass-panel sim-card">
+        <div class="sim-header">
+          <div style="font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>🎮 Bộ Giả Lập Kịch Bản (Scenario Simulator)</span>
+          </div>
+          <span class="card-owner-tag tag-dat">Đạt Demo Mode</span>
+        </div>
+
+        <!-- 8 Kịch bản có sẵn theo tài liệu đồ án -->
+        <div class="sim-preset-grid">
+          <button class="btn-sim-preset active" data-scenario="normal">
+            <span>🟢</span> 1. Bình thường
+          </button>
+          <button class="btn-sim-preset" data-scenario="obstacle_danger">
+            <span>🟡</span> 2. Vật cản &lt;50cm
+          </button>
+          <button class="btn-sim-preset" data-scenario="water_warning">
+            <span>🌊</span> 3. Chạm vũng nước
+          </button>
+          <button class="btn-sim-preset" data-scenario="night_mode">
+            <span>🌙</span> 4. Trời tối (Bật LED)
+          </button>
+          <button class="btn-sim-preset" data-scenario="sos_emergency">
+            <span>🚨</span> 5. Nhấn nút SOS
+          </button>
+          <button class="btn-sim-preset" data-scenario="cane_fall">
+            <span>⚠️</span> 6. Nghi ngờ gậy đổ
+          </button>
+          <button class="btn-sim-preset" data-scenario="geofence_out">
+            <span>📍</span> 7. Ra khỏi Geofence
+          </button>
+          <button class="btn-sim-preset" data-scenario="offline">
+            <span>❌</span> 8. Mất kết nối
+          </button>
+        </div>
+
+        <!-- Thanh trượt điều khiển thủ công -->
+        <div class="manual-controls-title">Điều chỉnh thông số thủ công:</div>
+        <div class="slider-group">
+          
+          <div class="slider-item">
+            <div class="slider-header">
+              <span>Khoảng cách vật cản (HC-SR04)</span>
+              <span id="lbl-slider-dist" class="slider-val">85.0 cm</span>
+            </div>
+            <input id="slider-dist" type="range" min="10" max="250" value="85" step="1">
+          </div>
+
+          <div class="slider-item">
+            <div class="slider-header">
+              <span>Cảm biến nước ADC (Water Sensor - GPIO 35)</span>
+              <span id="lbl-slider-water" class="slider-val">340 ADC</span>
+            </div>
+            <input id="slider-water" type="range" min="0" max="4095" value="340" step="10">
+          </div>
+
+          <div class="slider-item">
+            <div class="slider-header">
+              <span>Cảm biến ánh sáng ADC (LDR - GPIO 34)</span>
+              <span id="lbl-slider-light" class="slider-val">2850 ADC</span>
+            </div>
+            <input id="slider-light" type="range" min="0" max="4095" value="2850" step="10">
+          </div>
+
+        </div>
+
+        <!-- Switch Controls -->
+        <div class="switch-group">
+          <label class="switch-label">
+            <input id="chk-water" type="checkbox">
+            <span>Tiếp xúc nước</span>
+          </label>
+          <label class="switch-label">
+            <input id="chk-led" type="checkbox">
+            <span>LED ban đêm</span>
+          </label>
+          <label class="switch-label">
+            <input id="chk-sos" type="checkbox">
+            <span>Kích hoạt SOS</span>
+          </label>
+        </div>
+
+        <!-- Raw JSON Contract Viewer -->
+        <div class="manual-controls-title" style="margin-top: 14px;">Telemetry JSON Payload (docs/MQTT_CONTRACT.md):</div>
+        <pre id="json-preview" class="json-output-box"></pre>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ========================================================================
+       MODAL: Tài liệu & Hướng dẫn kiểm thử Đạt
+       ======================================================================== -->
+  <div id="modal-overlay" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 style="font-size: 1.15rem; font-weight: 800; color: #fff;">
+          📘 Tài Liệu Kỹ Thuật & Nghiệm Thu — Module Đạt
+        </h2>
+        <button id="btn-close-modal" class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>
+          <strong>Họ và tên thành viên:</strong> Đạt (PTIT)<br>
+          <strong>Phạm vi phụ trách:</strong> Giao diện Web Dashboard (Đ01, Đ02, Đ03, Đ05), Cảm biến Nước (Water Sensor), Cảm biến Quang trở (LDR Module), Đèn LED ban đêm (Đ04).
+        </p>
+        <p>
+          <strong>1. Tiêu chí nghiệm thu Tuần 1 (Đ01 - Đ02 - Đ04):</strong>
+          <br>• Web Dashboard chạy độc lập với Leaflet Map, Geofence cảnh báo, 8 kịch bản kiểm thử trực quan.
+          <br>• Mô phỏng Wokwi hoàn chỉnh tại thư mục <code>simulation/dat/</code> (file <code>diagram.json</code> và <code>sketch.ino</code>).
+          <br>• Đóng gói mã nguồn C++ module hóa theo đúng hợp đồng <code>docs/MODULE_INTERFACE.md</code> tại <code>firmware/include/EnvironmentModule.h</code> và <code>firmware/src/EnvironmentModule.cpp</code>.
+        </p>
+        <p>
+          <strong>2. Quy ước kỹ thuật ADC & Trễ Hysteresis:</strong>
+          <br>• Cảm biến nước (GPIO 35): Khi ADC &ge; 1500 &rarr; Kích hoạt cảnh báo nước ngập.
+          <br>• Cảm biến ánh sáng (GPIO 34): ADC &lt; 1600 (Trời tối) &rarr; Tự động bật LED (GPIO 32). ADC &gt; 2100 (Trời sáng) &rarr; Tắt LED. Vùng 1600 - 2100 giữ nguyên trạng thái giúp chống chớp nháy.
+        </p>
+
+        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 16px 0;">
+
+        <div>
+          <h3 style="color: var(--accent-cyan); font-size: 0.95rem; margin-bottom: 6px;">
+            📡 3. Kết Nối Backend Thật (Nghiệm Thu Đ03 - WebSocket / REST API):
+          </h3>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 10px;">
+            Khi backend Spring Boot của Giang khởi chạy (cổng 8080), giao diện có thể kết nối trực tiếp nhận dữ liệu thời gian thực từ ESP32 thay cho bộ giả lập Mock:
+          </p>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <input id="input-backend-url" type="text" value="ws://localhost:8080/ws/telemetry" style="flex: 1; min-width: 220px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-color); color: #fff; padding: 7px 10px; border-radius: 6px; font-family: var(--font-mono); font-size: 0.82rem;" placeholder="ws://localhost:8080/ws/telemetry">
+            <button id="btn-connect-backend" class="btn-header primary" style="padding: 7px 16px;">Kết Nối Backend</button>
+            <button id="btn-disconnect-backend" class="btn-header" style="padding: 7px 16px;">Dùng Lại Mock</button>
+          </div>
+          <div id="backend-conn-status-msg" style="font-size: 0.78rem; color: #eab308; margin-top: 8px;">
+            • Hiện tại: Đang chạy ở chế độ Standalone Mock (8 kịch bản giả lập).
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet JavaScript CDN -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <!-- Application Logic -->
+  <script src="./app.js"></script>
+</body>
+</html>
