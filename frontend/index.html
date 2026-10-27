@@ -53,6 +53,12 @@
         🕒 <span id="last-sync-time">--:--:--</span>
       </div>
 
+      <!-- Backend Mode Toggle (Đ03) -->
+      <button id="btn-toggle-backend" class="btn-header" title="Chuyển đổi giữa chế độ Giả lập và Kết nối Backend thật (REST / WebSocket)">
+        <span id="backend-status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#eab308; margin-right:5px;"></span>
+        <span id="backend-status-text">Mô Phỏng (Mock)</span>
+      </button>
+
       <!-- Quick Actions -->
       <button id="btn-toggle-sound" class="btn-header" title="Bật/Tắt âm thanh cảnh báo demo">
         🔊 Âm Báo: BẬT
@@ -430,6 +436,25 @@
           <br>• Cảm biến nước (GPIO 35): Khi ADC &ge; 1500 &rarr; Kích hoạt cảnh báo nước ngập.
           <br>• Cảm biến ánh sáng (GPIO 34): ADC &lt; 1600 (Trời tối) &rarr; Tự động bật LED (GPIO 32). ADC &gt; 2100 (Trời sáng) &rarr; Tắt LED. Vùng 1600 - 2100 giữ nguyên trạng thái giúp chống chớp nháy.
         </p>
+
+        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 16px 0;">
+
+        <div>
+          <h3 style="color: var(--accent-cyan); font-size: 0.95rem; margin-bottom: 6px;">
+            📡 3. Kết Nối Backend Thật (Nghiệm Thu Đ03 - WebSocket / REST API):
+          </h3>
+          <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 10px;">
+            Khi backend Spring Boot của Giang khởi chạy (cổng 8080), giao diện có thể kết nối trực tiếp nhận dữ liệu thời gian thực từ ESP32 thay cho bộ giả lập Mock:
+          </p>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <input id="input-backend-url" type="text" value="ws://localhost:8080/ws/telemetry" style="flex: 1; min-width: 220px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-color); color: #fff; padding: 7px 10px; border-radius: 6px; font-family: var(--font-mono); font-size: 0.82rem;" placeholder="ws://localhost:8080/ws/telemetry">
+            <button id="btn-connect-backend" class="btn-header primary" style="padding: 7px 16px;">Kết Nối Backend</button>
+            <button id="btn-disconnect-backend" class="btn-header" style="padding: 7px 16px;">Dùng Lại Mock</button>
+          </div>
+          <div id="backend-conn-status-msg" style="font-size: 0.78rem; color: #eab308; margin-top: 8px;">
+            • Hiện tại: Đang chạy ở chế độ Standalone Mock (8 kịch bản giả lập).
+          </div>
+        </div>
       </div>
     </div>
   </div>

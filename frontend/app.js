@@ -839,7 +839,189 @@ function setupEventListeners() {
       btnToggleSound.classList.toggle('active', state.config.sound_enabled);
     });
   }
+
+  // Toggle Chế độ Backend (Đ03)
+  const btnToggleBackend = document.getElementById('btn-toggle-backend');
+  if (btnToggleBackend) {
+    btnToggleBackend.addEventListener('click', () => {
+      if (backendManager.isLive) {
+        backendManager.disconnect();
+      } else {
+        const modal = document.getElementById('modal-overlay');
+        if (modal) modal.classList.add('active');
+        const inputUrl = document.getElementById('input-backend-url');
+        if (inputUrl) inputUrl.focus();
+      }
+    });
+  }
+
+  // Kết nối Backend từ Modal
+  const btnConnectBackend = document.getElementById('btn-connect-backend');
+  if (btnConnectBackend) {
+    btnConnectBackend.addEventListener('click', () => {
+      const input = document.getElementById('input-backend-url');
+      const url = input ? input.value.trim() : 'ws://localhost:8080/ws/telemetry';
+      backendManager.connect(url);
+    });
+  }
+
+  // Ngắt kết nối Backend từ Modal
+  const btnDisconnectBackend = document.getElementById('btn-disconnect-backend');
+  if (btnDisconnectBackend) {
+    btnDisconnectBackend.addEventListener('click', () => {
+      backendManager.disconnect();
+    });
+  }
 }
+
+// ============================================================================
+// QUẢN LÝ KẾT NỐI BACKEND THẬT (Đ03 - WebSocket & REST Polling)
+// ============================================================================
+const backendManager = {
+  ws: null,
+  isLive: false,
+  pollingTimer: null,
+  targetUrl: 'ws://localhost:8080/ws/telemetry',
+
+  updateBadge(status, text, color) {
+    const dot = document.getElementById('backend-status-dot');
+    const label = document.getElementById('backend-status-text');
+    const msg = document.getElementById('backend-conn-status-msg');
+
+    if (dot) dot.style.background = color;
+    if (label) label.textContent = text;
+    if (msg) {
+      msg.textContent = `• Trạng thái: ${status}`;
+      msg.style.color = color;
+    }
+  },
+
+  connect(url) {
+    this.disconnect();
+    this.targetUrl = url || this.targetUrl;
+    this.updateBadge('Đang thử kết nối tới ' + this.targetUrl + '...', 'Đang kết nối...', '#38bdf8');
+
+    if (this.targetUrl.startsWith('ws://') || this.targetUrl.startsWith('wss://')) {
+      try {
+        this.ws = new WebSocket(this.targetUrl);
+
+        this.ws.onopen = () => {
+          this.isLive = true;
+          this.updateBadge('Đã kết nối trực tiếp với Backend Spring Boot (' + this.targetUrl + ')', 'Trực Tuyến (Live)', '#10b981');
+          addEventLog('BACKEND_CONNECTED', 'Kết nối Backend thành công', `Đã mở kênh WebSocket nhận dữ liệu thời gian thực từ ESP32`, 'info');
+        };
+
+        this.ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            this.handleIncomingData(data);
+          } catch (e) {
+            console.warn('[Backend] Lỗi parse JSON:', e);
+          }
+        };
+
+        this.ws.onerror = (err) => {
+          console.warn('[Backend] Lỗi WebSocket:', err);
+          this.updateBadge('Không thể kết nối tới Backend (Kiểm tra xem Spring Boot đã chạy chưa)', 'Mô Phỏng (Mock)', '#eab308');
+        };
+
+        this.ws.onclose = () => {
+          if (this.isLive) {
+            this.isLive = false;
+            this.updateBadge('Mất kết nối Backend. Tự động chuyển về Chế độ Giả lập (Mock)', 'Mô Phỏng (Mock)', '#eab308');
+            addEventLog('BACKEND_DISCONNECTED', 'Mất kết nối Backend', 'Đã chuyển về chế độ giả lập nội bộ (Standalone Mock)', 'warning');
+          }
+        };
+      } catch (err) {
+        this.updateBadge('Lỗi khởi tạo WebSocket: ' + err.message, 'Mô Phỏng (Mock)', '#ef4444');
+      }
+    } else {
+      // Chế độ HTTP REST Polling
+      this.isLive = true;
+      this.updateBadge('Đang nhận dữ liệu qua REST Polling (' + this.targetUrl + ')', 'REST Polling', '#10b981');
+      addEventLog('BACKEND_REST', 'Kích hoạt REST Polling', `Chu kỳ lấy mẫu 2000ms qua REST API: ${this.targetUrl}`, 'info');
+
+      this.pollingTimer = setInterval(async () => {
+        try {
+          const res = await fetch(`${this.targetUrl}/api/v1/telemetry`);
+          if (res.ok) {
+            const json = await res.json();
+            this.handleIncomingData(json);
+          }
+        } catch (e) {
+          console.warn('[Backend] Lỗi polling REST API:', e);
+        }
+      }, 2000);
+    }
+  },
+
+  disconnect() {
+    if (this.ws) {
+      try { this.ws.close(); } catch(e){}
+      this.ws = null;
+    }
+    if (this.pollingTimer) {
+      clearInterval(this.pollingTimer);
+      this.pollingTimer = null;
+    }
+    this.isLive = false;
+    this.updateBadge('Đang hoạt động ở chế độ Giả lập nội bộ (Standalone Mock)', 'Mô Phỏng (Mock)', '#eab308');
+  },
+
+  handleIncomingData(payload) {
+    if (!payload || typeof payload !== 'object') return;
+    const t = state.telemetry;
+    const s = state.safety;
+
+    // Cập nhật các trường theo docs/MQTT_CONTRACT.md
+    if (payload.device_id) t.device_id = payload.device_id;
+    if (payload.distance_cm !== undefined && payload.distance_cm !== null) {
+      t.distance_cm = parseFloat(payload.distance_cm);
+    }
+    if (payload.water_detected !== undefined) {
+      t.water_detected = Boolean(payload.water_detected);
+    }
+    if (payload.water_adc !== undefined) {
+      t.water_adc = parseInt(payload.water_adc);
+    }
+    if (payload.light_level !== undefined) {
+      t.light_level = parseInt(payload.light_level);
+    }
+    if (payload.led_on !== undefined) {
+      t.led_on = Boolean(payload.led_on);
+    }
+    if (payload.latitude !== undefined && payload.latitude !== null) {
+      t.latitude = parseFloat(payload.latitude);
+    }
+    if (payload.longitude !== undefined && payload.longitude !== null) {
+      t.longitude = parseFloat(payload.longitude);
+    }
+    if (payload.gps_valid !== undefined) {
+      t.gps_valid = Boolean(payload.gps_valid);
+    }
+    if (payload.battery_percent !== undefined) {
+      t.battery_percent = parseInt(payload.battery_percent);
+    }
+    if (payload.battery_voltage !== undefined) {
+      t.battery_voltage = parseFloat(payload.battery_voltage);
+    }
+    if (payload.sos !== undefined) {
+      s.sos = Boolean(payload.sos);
+    }
+    if (payload.fall_alert !== undefined) {
+      s.fall_alert = Boolean(payload.fall_alert);
+    }
+    if (payload.status) {
+      t.status = payload.status;
+    }
+
+    t.timestamp = payload.timestamp || new Date().toISOString();
+    s.is_online = true;
+
+    syncSlidersFromState();
+    updateUI();
+  }
+};
 
 // ============================================================================
 // KHỞI ĐỘNG ỨNG DỤNG
@@ -855,14 +1037,13 @@ window.addEventListener('DOMContentLoaded', () => {
   syncSlidersFromState();
   updateUI();
 
-  // Mô phỏng dao động nhẹ thời gian thực (Heartbeat simulation)
+  // Mô phỏng dao động nhẹ thời gian thực khi ở chế độ Mock
   setInterval(() => {
     state.telemetry.timestamp = new Date().toISOString();
-    // Dao động nhẹ ánh sáng & pin để tạo cảm giác sống động (dynamic telemetry)
-    if (state.safety.is_online) {
+    if (!backendManager.isLive && state.safety.is_online) {
       const jitter = (Math.random() - 0.5) * 2;
       state.telemetry.distance_cm = Math.max(15, Math.min(220, state.telemetry.distance_cm + jitter * 0.5));
+      updateUI();
     }
-    updateUI();
   }, 2500);
 });
