@@ -11,13 +11,13 @@
   "connections": [
     [ "esp:TX0", "$serialMonitor:RX", "", [] ],
     [ "esp:RX0", "$serialMonitor:TX", "", [] ],
-    [ "esp:21", "mpu:SDA", "green", [] ],
-    [ "esp:22", "mpu:SCL", "blue", [] ],
+    [ "esp:D21", "mpu:SDA", "green", [] ],
+    [ "esp:D22", "mpu:SCL", "blue", [] ],
     [ "esp:3V3", "mpu:VCC", "red", [] ],
     [ "esp:GND.1", "mpu:GND", "black", [] ],
-    [ "esp:13", "button:1.l", "green", [] ],
+    [ "esp:D13", "button:1.l", "green", [] ],
     [ "button:2.l", "esp:GND.1", "black", [] ],
-    [ "esp:14", "buzzer:2", "orange", [] ],
+    [ "esp:D14", "buzzer:2", "orange", [] ],
     [ "buzzer:1", "esp:GND.1", "black", [] ]
   ]
 }

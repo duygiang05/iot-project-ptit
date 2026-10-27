@@ -7,6 +7,8 @@
 3. Mở `diagram.json` trong editor, thay bằng sơ đồ cùng tên trong folder này.
 4. `libraries.txt` đã ghi dependency (không cần thư viện ngoài). Bấm Start Simulation và xem Serial Monitor ở 115200 baud.
 
+Nếu Serial báo `MPU6050: NOT FOUND`, kiểm tra dây I2C trong sơ đồ: `D21 -> SDA`, `D22 -> SCL`, `3V3 -> VCC`, `GND -> GND`. Nút SOS vẫn hoạt động riêng trên GPIO13.
+
 - Nhấn giữ nút GPIO13 ít nhất 3 giây: nhận đúng một `[EVENT] SOS`; còi bật trong lúc nhấn và chirp khi gửi SOS.
 - Nghiêng MPU6050 vượt 60° đồng thời tạo gia tốc thấp hơn 0.55g hoặc cao hơn 1.8g: sau 600ms sẽ có `[EVENT] CANE_FALL_SUSPECTED`.
 - Trong 10 giây sau nghi ngờ, nhấn nút: `[EVENT] CANCEL`; để hết thời gian: `[EVENT] CANE_FALL_ALERT`.

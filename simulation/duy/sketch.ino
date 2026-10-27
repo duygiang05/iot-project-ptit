@@ -105,6 +105,7 @@ void setup() {
   rawButton = stableButton = digitalRead(BUTTON_PIN) == LOW;
   buttonPressedAt = buttonChangedAt = millis();
   Serial.printf("Smart Cane D01/D02 | MPU6050: %s\n", mpuReady ? "OK" : "NOT FOUND");
+  if (!mpuReady) Serial.println("[ERROR] Check diagram wires: D21->SDA, D22->SCL, 3V3->VCC, GND->GND.");
   Serial.println("Hold SOS button 3s. Tilt + impact simulates suspected cane fall.");
   Serial.println("This demo detects cane-fall suspicion, not a person's fall.");
 }
@@ -113,6 +114,11 @@ void loop() {
   uint32_t now = millis();
   float accelG = 1.0f, tiltDeg = 0.0f;
   bool sensorOk = readMpu(accelG, tiltDeg);
+  static bool sensorErrorShown = false;
+  if (!sensorOk && !sensorErrorShown) {
+    Serial.println("[ERROR] MPU6050 read failed; fall detection is disabled. SOS button remains available.");
+    sensorErrorShown = true;
+  }
   updateSafety(digitalRead(BUTTON_PIN) == LOW,
                sensorOk ? accelG : 1.0f,
                sensorOk ? tiltDeg : 0.0f, now);
