@@ -1,27 +1,27 @@
-# Smart Cane IoT Backend (G03 + G04)
+# Smart Cane backend
 
-Java 21, Spring Boot 3.3.13, Spring Integration MQTT, PostgreSQL 16.
+Spring Boot 3.3, Java 21, MQTT event/telemetry consumer, PostgreSQL, REST read API, and optional Telegram alerts.
 
-## Install
-Extract this ZIP into `D:\IOT-PROJECT` so `backend/pom.xml` exists. Do **not** delete sibling folders.
+## Local run
 
-## Prerequisites
-- Java 21 and Maven 3.9+
-- Existing Docker services: Mosquitto 127.0.0.1:1883; PostgreSQL 127.0.0.1:5433
-- DB `smartcane`, user `smartcane`, password configured in the existing Docker `.env`.
+Start Mosquitto and PostgreSQL from the project root:
 
-## Run (PowerShell)
 ```powershell
-cd D:\IOT-PROJECT
-docker compose --env-file .env -f infra/compose.yaml ps
-$env:DB_PASSWORD = '<your local PostgreSQL password>'
-cd backend
-mvn clean test
+docker compose --env-file .env -f infra/compose.yaml up -d
+```
+
+Set database credentials in the backend process environment, then run:
+
+```powershell
+$env:DB_PASSWORD = '<local PostgreSQL password>'
+$env:TELEGRAM_BOT_TOKEN = '<bot token>'
+$env:TELEGRAM_CHAT_ID = '<test chat id>'
+mvn test
 mvn spring-boot:run
 ```
 
-API: http://localhost:8081/api/devices/cane-01/telemetry/latest and http://localhost:8081/api/devices/cane-01/incidents.
+Telegram variables are optional. If absent, events are still saved and Telegram is skipped. Configure them only in a local environment; never commit real credentials. Use a test bot/chat while running notification integration cases.
 
-MQTT topics: `smartcane/+/telemetry`, `smartcane/+/events`. Keep Bookstore 8080 unaffected.
+The backend notifies for committed SOS and `CANE_FALL_ALERT` incidents, includes a Maps URL only for validated GPS coordinates, and ignores duplicate `event_id` values. `CANCEL` and `CANE_FALL_SUSPECTED` are stored without Telegram notifications.
 
-**Note:** only backend, no Wokwi/firmware/frontend included. G03/G04 require live tests. SQL schema uses Hibernate `ddl-auto: update` for local dev only. DB credential is an environment variable, never commit the real secret.
+Read API: `/api/devices/{deviceId}/incidents?limit=20` and `/api/devices/{deviceId}/telemetry/latest`.

@@ -38,9 +38,11 @@ class SafetyModule {
   bool buzzerOn_ = false;
   bool eventPending_ = false;
   bool fallCandidate_ = false;
+  bool impactSeen_ = false;
   uint32_t rawChangedAt_ = 0;
   uint32_t pressedAt_ = 0;
   uint32_t suspectedAt_ = 0;
+  uint32_t lastImpactAt_ = 0;
   uint32_t beepUntil_ = 0;
   FallState fallState_ = FallState::NORMAL;
   SafetyEvent queuedEvent_;

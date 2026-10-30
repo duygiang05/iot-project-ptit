@@ -6,7 +6,9 @@ namespace {
 constexpr float FALL_FREEFALL_MAX_G = 0.55f;
 constexpr float FALL_IMPACT_MIN_G = 1.80f;
 constexpr float FALL_TILT_DEGREES = 60.0f;
+constexpr float FALL_TILT_RESET_DEGREES = 45.0f;
 constexpr uint32_t FALL_CONFIRM_MS = 600;
+constexpr uint32_t IMPACT_MEMORY_MS = 3000;
 }
 
 void SafetyModule::begin(bool buttonPressed, uint32_t nowMs) {
@@ -49,6 +51,8 @@ void SafetyModule::update(bool buttonPressed, float accelerationG,
           nowMs - suspectedAt_ < CANCEL_WINDOW_MS) {
         fallState_ = FallState::NORMAL;
         fallCandidate_ = false;
+        impactSeen_ = false;
+        lastImpactAt_ = 0;
         holdHandled_ = true;
         beepUntil_ = nowMs + ALERT_BEEP_MS;
         emit(SafetyEventType::CANCEL, nowMs);
@@ -56,22 +60,30 @@ void SafetyModule::update(bool buttonPressed, float accelerationG,
     }
   }
 
-  if (stablePressed_ && !holdHandled_ && nowMs - pressedAt_ >= SOS_HOLD_MS) {
+  if (stablePressed_ && !holdHandled_ && fallState_ == FallState::NORMAL &&
+      nowMs - pressedAt_ >= SOS_HOLD_MS) {
     holdHandled_ = true;
     beepUntil_ = nowMs + ALERT_BEEP_MS;
     emit(SafetyEventType::SOS, nowMs);
   }
 
+  const bool impact = accelerationG <= FALL_FREEFALL_MAX_G ||
+                      accelerationG >= FALL_IMPACT_MIN_G;
+  if (impact) {
+    impactSeen_ = true;
+    lastImpactAt_ = nowMs;
+  }
+  const bool recentImpact = impactSeen_ && nowMs - lastImpactAt_ <= IMPACT_MEMORY_MS;
+  const float tilt = fabsf(tiltDegrees);
+
   if (fallState_ == FallState::NORMAL) {
-    const bool impact = accelerationG <= FALL_FREEFALL_MAX_G ||
-                        accelerationG >= FALL_IMPACT_MIN_G;
-    const bool tilted = fabsf(tiltDegrees) >= FALL_TILT_DEGREES;
-    if (impact && tilted && !fallCandidate_) {
-      // Latch the short impact/free-fall sample while the cane remains tilted.
+    // Impacts are brief. Latch one, then confirm a stable tilted orientation
+    // using subsequent near-gravity samples from the MPU6050.
+    if (recentImpact && tilt >= FALL_TILT_DEGREES && !fallCandidate_) {
       fallCandidate_ = true;
       suspectedAt_ = nowMs;
     }
-    if (fallCandidate_ && !tilted) {
+    if (fallCandidate_ && (!recentImpact || tilt < FALL_TILT_RESET_DEGREES)) {
       fallCandidate_ = false;
     } else if (fallCandidate_ && nowMs - suspectedAt_ >= FALL_CONFIRM_MS) {
       fallState_ = FallState::SUSPECTED;
@@ -87,6 +99,7 @@ void SafetyModule::update(bool buttonPressed, float accelerationG,
     }
   }
 
-  // SOS beeps while pressed; a fall warning chirps briefly and never blocks.
-  buzzerOn_ = (stablePressed_ && !holdHandled_) || nowMs < beepUntil_;
+  // Sound throughout the cancel window and persistent alert; SOS also sounds locally.
+  buzzerOn_ = (stablePressed_ && !holdHandled_) || nowMs < beepUntil_ ||
+              fallState_ == FallState::SUSPECTED || fallState_ == FallState::ALERT;
 }

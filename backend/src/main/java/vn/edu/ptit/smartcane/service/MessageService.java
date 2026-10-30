@@ -75,7 +75,6 @@ public class MessageService {
    if(Boolean.TRUE.equals(e.gpsValid)&&(e.latitude==null||e.longitude==null))throw new IllegalArgumentException("gps_valid=true requires coordinates");
    incidents.save(e);
    publisher.publishEvent(new RealtimeSaved(id,"incident",e));
-   // Telegram notification / durable outbox belongs to a separate integration task.
   }else throw new IllegalArgumentException("Unsupported topic");
  }
 }

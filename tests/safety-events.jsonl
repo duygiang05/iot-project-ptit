@@ -1,0 +1,4 @@
+{"event_id":"cane-demo-sos-001","device_id":"cane-01","type":"SOS","gps_valid":false,"latitude":null,"longitude":null}
+{"event_id":"cane-demo-fall-suspected-001","device_id":"cane-01","type":"CANE_FALL_SUSPECTED","gps_valid":false,"latitude":null,"longitude":null}
+{"event_id":"cane-demo-fall-alert-001","device_id":"cane-01","type":"CANE_FALL_ALERT","gps_valid":true,"latitude":10.762622,"longitude":106.660172}
+{"event_id":"cane-demo-cancel-001","device_id":"cane-01","type":"CANCEL","gps_valid":false,"latitude":null,"longitude":null}
